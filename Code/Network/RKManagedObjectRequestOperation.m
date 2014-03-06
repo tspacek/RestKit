@@ -734,12 +734,17 @@ BOOL RKDoesArrayOfResponseDescriptorsContainOnlyEntityMappings(NSArray *response
     }
     
     // Determine if there are any fetch request blocks to use for orphaned object cleanup
-    NSArray *fetchRequests = [self fetchRequestsMatchingResponseURL];
-    if (! [fetchRequests count]) return YES;
-    
+//    NSArray *fetchRequests = [self fetchRequestsMatchingResponseURL];
+//    if (! [fetchRequests count]) return YES;
+    NSFetchRequest *request = [NSFetchRequest fetchRequestWithEntityName:@"Human"];
+    request.sortDescriptors = @[ [NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES] ];
+    request.predicate = [NSPredicate predicateWithFormat:@"name <= %@ AND name > %@", [[[mappingResult array] lastObject] name], @"Roy"];
+//    NSArray *fetchRequests = @[ request ];
+
     // Proceed with cleanup
     NSSet *managedObjectsInMappingResult = RKManagedObjectsFromMappingResultWithMappingInfo(mappingResult, self.mappingInfo) ?: [NSSet set];
-    NSSet *localObjects = [self localObjectsFromFetchRequests:fetchRequests matchingRequestURL:error];
+//    NSSet *localObjects = [self localObjectsFromFetchRequests:fetchRequests matchingRequestURL:error];
+    NSSet *localObjects = [NSSet setWithArray:[self.privateContext executeFetchRequest:request error:nil]];
     if (! localObjects) {
         RKLogError(@"Failed when attempting to fetch local candidate objects for orphan cleanup: %@", error ? *error : nil);
         return NO;

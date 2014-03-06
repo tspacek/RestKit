@@ -237,12 +237,12 @@ class RestKitTestServer < Sinatra::Base
     case current_page
       when 1
         entries << Person.new('Blake', 29)
-        entries << Person.new('Sarah', 30)
         entries << Person.new('Colin', 27)
-      when 2
-        entries << Person.new('Asia', 8)
         entries << Person.new('Roy', 2)
-        entries << Person.new('Lola', 9)
+      when 2
+        entries << Person.new('Sarah', 30)
+        entries << Person.new('Terry', 8)
+        entries << Person.new('Wally', 9)
       when 3
         # Return an error payload
         status 422

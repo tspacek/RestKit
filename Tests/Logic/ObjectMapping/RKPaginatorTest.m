@@ -23,6 +23,8 @@
 #import "RKObjectMapperTestModel.h"
 #import "RKURLEncodedSerialization.h"
 
+#import "RKHuman.h"
+
 @interface RKPaginator (Testability)
 - (void)waitUntilFinished;
 @end
@@ -476,6 +478,59 @@ static NSString * const RKPaginatorTestResourcePathPatternWithOffset = @"/pagina
     [paginator loadPage:2];
     [paginator waitUntilFinished];
     expect(paginator.objectRequestOperation).willNot.equal(operation);
+}
+
+#pragma Removing Orphans
+
+- (void)testLoadingPageRemovesOrphan
+{
+    RKManagedObjectStore *managedObjectStore = [RKTestFactory managedObjectStore];
+    RKHuman *human = [NSEntityDescription insertNewObjectForEntityForName:@"Human" inManagedObjectContext:managedObjectStore.persistentStoreManagedObjectContext];
+    human.railsID = [NSNumber numberWithInteger:12345];
+    human.name = @"Adam";
+    [managedObjectStore.persistentStoreManagedObjectContext save:nil];
+
+    RKEntityMapping *mapping = [RKEntityMapping mappingForEntityForName:@"Human" inManagedObjectStore:managedObjectStore];
+    [mapping addAttributeMappingsFromArray:@[@"name", @"age"]];
+    RKResponseDescriptor *descriptor = [RKResponseDescriptor responseDescriptorWithMapping:mapping method:RKRequestMethodAny pathPattern:nil keyPath:@"entries" statusCodes:RKStatusCodeIndexSetForClass(RKStatusCodeClassSuccessful)];
+
+    NSURLRequest *request = [NSURLRequest requestWithURL:self.paginationURL];
+    RKPaginator *paginator = [[RKPaginator alloc] initWithRequest:request paginationMapping:self.paginationMapping responseDescriptors:@[ descriptor ]];
+    paginator.managedObjectContext = managedObjectStore.persistentStoreManagedObjectContext;
+    [paginator loadPage:1];
+    [paginator waitUntilFinished];
+
+    NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:@"Human"];
+    fetchRequest.sortDescriptors = @[ [NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES] ];
+    NSArray *humans = [managedObjectStore.persistentStoreManagedObjectContext executeFetchRequest:fetchRequest error:nil];
+
+    NSArray *expectedNames = @[ @"Blake", @"Colin", @"Sarah" ];
+    expect([humans valueForKey:@"name"]).to.equal(expectedNames);
+}
+
+- (void)testLoadingPageDoesNotRemovePreviouslyLoadedObjects
+{
+    RKManagedObjectStore *managedObjectStore = [RKTestFactory managedObjectStore];
+
+    RKEntityMapping *mapping = [RKEntityMapping mappingForEntityForName:@"Human" inManagedObjectStore:managedObjectStore];
+    [mapping addAttributeMappingsFromArray:@[@"name", @"age"]];
+    RKResponseDescriptor *descriptor = [RKResponseDescriptor responseDescriptorWithMapping:mapping method:RKRequestMethodAny pathPattern:nil keyPath:@"entries" statusCodes:RKStatusCodeIndexSetForClass(RKStatusCodeClassSuccessful)];
+
+    NSURLRequest *request = [NSURLRequest requestWithURL:self.paginationURL];
+    RKPaginator *paginator = [[RKPaginator alloc] initWithRequest:request paginationMapping:self.paginationMapping responseDescriptors:@[ descriptor ]];
+    paginator.managedObjectContext = managedObjectStore.persistentStoreManagedObjectContext;
+    [paginator loadPage:1];
+    [paginator waitUntilFinished];
+
+    [paginator loadPage:2];
+    [paginator waitUntilFinished];
+
+    NSFetchRequest *fetchRequest = [NSFetchRequest fetchRequestWithEntityName:@"Human"];
+    fetchRequest.sortDescriptors = @[ [NSSortDescriptor sortDescriptorWithKey:@"name" ascending:YES] ];
+    NSArray *humans = [managedObjectStore.persistentStoreManagedObjectContext executeFetchRequest:fetchRequest error:nil];
+
+    NSArray *expectedNames = @[ @"Blake", @"Colin", @"Roy", @"Sarah", @"Terry", @"Wally" ];
+    expect([humans valueForKey:@"name"]).to.equal(expectedNames);
 }
 
 @end
